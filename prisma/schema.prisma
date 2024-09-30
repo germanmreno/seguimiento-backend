@@ -1,0 +1,120 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  user_id Bytes @id @db.Binary(16) @default(dbgenerated("(uuid_to_bin(uuid()))"))
+  user_handle String
+  user_password String
+  user_role String
+  user_office String
+  email_address String
+  first_name String
+  last_name String
+  phone_number String
+  created_at DateTime @default(now())
+
+  @@map("users")
+}
+
+model Memo {
+  id               String   @id
+  name             String
+  applicant        String
+  reception_method ReceptionMethod
+  instruction      Instruction
+  response_require ResponseRequire
+  urgency          Urgency?
+  observation      String
+  reception_date   DateTime @db.Date
+  reception_hour   String 
+  attachment       Json
+  status           Status @default(PENDING)
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  offices          MemoOffice[] @relation("MemoOffices")
+
+  @@map("memos")
+}
+
+model Office {
+  id String @id
+  abrev String
+  name String
+
+  memos MemoOffice[] @relation("MemoOffices")
+
+  @@map("offices")
+}
+
+model MemoOffice {
+  memo_id   String
+  office_id String
+
+  memo   Memo   @relation(fields: [memo_id], references: [id], name: "MemoOffices")
+  office Office @relation(fields: [office_id], references: [id], name: "MemoOffices")
+
+  @@id([memo_id, office_id])
+  @@map("memos_offices")
+}
+
+enum ReceptionMethod {
+  MESA_DE_PARTES
+  CORREO
+  PRE_VP
+}
+
+enum Instruction {
+  PROCESAR
+  CHEQUEAR
+  COORDINAR
+  VERIFICAR
+  EVALUAR
+  PREPARAR
+  RESOLVER
+  SEGUIR
+  COORDINAREU
+  APOYAR
+  DIFUNDIR
+  PRESENTE
+  ESPERAR
+  ARCHIVAR
+}
+
+enum ResponseRequire {
+  YES
+  NO
+}
+
+enum Urgency {
+  NORMAL
+  MEDIUM
+  PRIORITY
+  URGENT
+}
+
+enum Attachment {
+  NO
+  CD
+  DIGITAL
+  PENDRIVE
+  CARPETA
+  IMPRESO
+}
+
+enum Status {
+  PENDING
+  COMPLETED
+}
