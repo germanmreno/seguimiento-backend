@@ -45,6 +45,7 @@ model Memo {
   updated_at       DateTime @updatedAt
 
   offices          MemoOffice[] @relation("MemoOffices")
+  forums      Forum[]
 
   @@map("memos")
 }
@@ -57,6 +58,17 @@ model Office {
   memos MemoOffice[] @relation("MemoOffices")
 
   @@map("offices")
+}
+
+model Forum {
+  id          Int          @id @default(autoincrement())
+  title       String
+  description String
+  memo_id     String
+
+  memo Memo @relation(fields: [memo_id], references: [id])
+
+  @@map("forums")
 }
 
 model MemoOffice {

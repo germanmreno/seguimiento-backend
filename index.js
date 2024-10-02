@@ -1,6 +1,7 @@
 import express, { json, urlencoded } from 'express';
 import cors from 'cors';
 import memosRouter from './routes/memos.js';
+import forumRouter from './routes/forums.js';
 import prisma from './db/prismaClient.js';
 
 const app = express();
@@ -18,6 +19,7 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 app.use('/memos', memosRouter);
+app.use('/forums', forumRouter);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
