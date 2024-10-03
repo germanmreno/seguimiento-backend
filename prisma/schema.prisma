@@ -64,7 +64,7 @@ model Forum {
   id          Int          @id @default(autoincrement())
   title       String
   description String
-  memo_id     String
+  memo_id     String @db.VarChar(191)
 
   memo Memo @relation(fields: [memo_id], references: [id])
 
