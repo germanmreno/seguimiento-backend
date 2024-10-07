@@ -68,4 +68,27 @@ router.get('/', async (req, res) => {
   }
 });
 
+router.patch('/:id/status', async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  if (!['PENDING', 'COMPLETED'].includes(status)) {
+    return res.status(400).json({ error: 'Invalid status value' });
+  }
+
+  console.log(id, status);
+
+  try {
+    const updatedMemo = await prisma.memo.update({
+      where: { id: id },
+      data: { status },
+    });
+
+    res.status(200).json(updatedMemo);
+  } catch (error) {
+    console.error('Failed to change status:', error);
+    res.status(500).json({ error: 'Failed to change status' });
+  }
+});
+
 export default router;
