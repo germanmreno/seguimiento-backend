@@ -1,0 +1,37 @@
+###
+# Register a new user
+POST http://localhost:3000/auth/register
+Content-Type: application/json
+
+{
+  "ci": "27376360",
+  "username": "ADMIN4",
+  "password": "1234567",
+  "firstName": "German",
+  "lastName": "Tecnología",
+  "office_id": "100"
+}
+
+###
+POST http://localhost:3000/auth/login
+Content-Type: application/json
+
+{
+  "username": "ADMIN4",
+  "password": "1234567"
+}
+
+###
+POST http://localhost:3000/auth/register
+Content-Type: application/json
+
+{
+  "ci": "10100100",
+  "username": "DESIREEPEREZ",
+  "password": "1234567",
+  "firstName": "Desiree",
+  "lastName": "Perez",
+  "office_id": "100"
+}
+
+

@@ -13,120 +13,90 @@ generator client {
   provider = "prisma-client-js"
 }
 
-model User {
-  user_id Bytes @id @db.Binary(16) @default(dbgenerated("(uuid_to_bin(uuid()))"))
-  user_handle String
-  user_password String
-  user_role String
-  user_office String
-  email_address String
-  first_name String
-  last_name String
-  phone_number String
-  created_at DateTime @default(now())
+enum Role {
+  USER
+  ADMIN
+}
 
-  @@map("users")
+model User {
+  id        String    @id
+  ci        String    @unique
+  username  String    @unique
+  password  String
+  firstName String
+  lastName  String
+  role      Role      @default(USER)
+  office_id String
+  messages  Message[]
+
+  @@map("user")
+}
+
+model Office {
+  id    String       @id
+  abrev String
+  name  String
+  memos MemoOffice[]
+
+  @@map("offices")
 }
 
 model Memo {
   id               String   @id
   name             String
   applicant        String
-  reception_method ReceptionMethod
-  instruction      Instruction
-  response_require ResponseRequire
-  urgency          Urgency?
+  reception_method String
+  instruction      String
+  response_require String
+  urgency          String?
   observation      String
   reception_date   DateTime @db.Date
-  reception_hour   String 
+  reception_hour   String
   attachment       Json
-  status           Status @default(PENDING)
+  status           String   @default("PENDING")
   created_at       DateTime @default(now())
-  updated_at       DateTime @updatedAt
+  updated_at       DateTime @default(now()) @updatedAt
 
-  offices          MemoOffice[] @relation("MemoOffices")
-  forums      Forum[]
+  offices MemoOffice[]
+  forums  Forum[]
 
   @@map("memos")
 }
 
-model Office {
-  id String @id
-  abrev String
-  name String
-
-  memos MemoOffice[] @relation("MemoOffices")
-
-  @@map("offices")
-}
-
 model Forum {
-  id          Int          @id @default(autoincrement())
+  id          Int       @id @default(autoincrement())
   title       String
   description String
-  memo_id     String @db.VarChar(191)
+  memo_id     String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt @default(now())
+  messages    Message[]
 
   memo Memo @relation(fields: [memo_id], references: [id])
 
   @@map("forums")
 }
 
+model Message {
+  id        Int      @id @default(autoincrement())
+  content   String
+  createdAt DateTime @default(now())
+  user_id   String // Change this to String to match User.id
+  forum_id  Int
+
+  user  User  @relation(fields: [user_id], references: [id])
+  forum Forum @relation(fields: [forum_id], references: [id])
+
+  @@map("messages")
+}
+
 model MemoOffice {
   memo_id   String
   office_id String
 
-  memo   Memo   @relation(fields: [memo_id], references: [id], name: "MemoOffices")
-  office Office @relation(fields: [office_id], references: [id], name: "MemoOffices")
+  memo   Memo   @relation(fields: [memo_id], references: [id])
+  office Office @relation(fields: [office_id], references: [id])
 
   @@id([memo_id, office_id])
   @@map("memos_offices")
-}
-
-enum ReceptionMethod {
-  MESA_DE_PARTES
-  CORREO
-  PRE_VP
-}
-
-enum Instruction {
-  PROCESAR
-  CHEQUEAR
-  COORDINAR
-  VERIFICAR
-  EVALUAR
-  PREPARAR
-  RESOLVER
-  SEGUIR
-  COORDINAREU
-  APOYAR
-  DIFUNDIR
-  PRESENTE
-  ESPERAR
-  ARCHIVAR
-}
-
-enum ResponseRequire {
-  YES
-  NO
-}
-
-enum Urgency {
-  NORMAL
-  MEDIUM
-  PRIORITY
-  URGENT
-}
-
-enum Attachment {
-  NO
-  CD
-  DIGITAL
-  PENDRIVE
-  CARPETA
-  IMPRESO
-}
-
-enum Status {
-  PENDING
-  COMPLETED
 }
