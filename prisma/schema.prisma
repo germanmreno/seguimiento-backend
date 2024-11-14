@@ -63,13 +63,19 @@ model Memo {
   @@map("memos")
 }
 
+enum ForumStatus {
+  OPEN
+  CLOSED
+}
+
 model Forum {
-  id          Int       @id @default(autoincrement())
+  id          Int         @id @default(autoincrement())
   title       String
   description String
   memo_id     String
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt @default(now())
+  status      ForumStatus @default(OPEN)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt @default(now())
   messages    Message[]
 
   memo Memo @relation(fields: [memo_id], references: [id])
@@ -83,6 +89,8 @@ model Message {
   createdAt DateTime @default(now())
   user_id   String // Change this to String to match User.id
   forum_id  Int
+  fileUrl   String?  // Add these
+  fileName  String?  // new fields
 
   user  User  @relation(fields: [user_id], references: [id])
   forum Forum @relation(fields: [forum_id], references: [id])

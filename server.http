@@ -34,4 +34,17 @@ Content-Type: application/json
   "office_id": "100"
 }
 
+###
+POST http://localhost:3000/auth/register
+Content-Type: application/json
+
+{
+  "ci": "20200200",
+  "username": "GERMANTECNOLOGIA",
+  "password": "1234567",
+  "firstName": "German",
+  "lastName": "Moreno",
+  "office_id": "100"
+}
+
 

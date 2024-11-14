@@ -194,4 +194,60 @@ router.get('/:forumId/messages', async (req, res) => {
   }
 });
 
+// Add this new endpoint
+router.patch('/:id/status', async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  if (!['OPEN', 'CLOSED'].includes(status)) {
+    return res.status(400).json({ error: 'Invalid status value' });
+  }
+
+  try {
+    const updatedForum = await prisma.forum.update({
+      where: { id: parseInt(id) },
+      data: { status },
+    });
+
+    res.status(200).json(updatedForum);
+  } catch (error) {
+    console.error('Failed to update forum status:', error);
+    res.status(500).json({ error: 'Failed to update forum status' });
+  }
+});
+
+// Add this new endpoint for deleting messages
+router.delete('/:forumId/messages/:messageId', async (req, res) => {
+  const { messageId } = req.params;
+  const { user_id } = req.body;
+
+  try {
+    // First check if the message exists and belongs to the user
+    const message = await prisma.message.findUnique({
+      where: { id: parseInt(messageId) },
+    });
+
+    if (!message) {
+      return res.status(404).json({ error: 'Message not found' });
+    }
+
+    // Verify the user is the owner of the message
+    if (message.user_id !== user_id) {
+      return res
+        .status(403)
+        .json({ error: 'Unauthorized to delete this message' });
+    }
+
+    // Delete the message
+    await prisma.message.delete({
+      where: { id: parseInt(messageId) },
+    });
+
+    res.status(200).json({ message: 'Message deleted successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to delete message' });
+  }
+});
+
 export default router;

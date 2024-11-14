@@ -4,6 +4,8 @@ import memosRouter from './routes/memos.js';
 import forumRouter from './routes/forums.js';
 import authRoutes from './routes/auth.js';
 import prisma from './db/prismaClient.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 const app = express();
 
@@ -22,6 +24,12 @@ app.use(cors(corsOptions));
 app.use('/memos', memosRouter);
 app.use('/forums', forumRouter);
 app.use('/auth', authRoutes);
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Serve static files from uploads directory
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
