@@ -1,55 +1,129 @@
 import express from 'express';
 import prisma from '../db/prismaClient.js';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
 
 const router = express.Router();
 
-// Create a new memo
-router.post('/', async (req, res) => {
-  const {
-    id,
-    name,
-    applicant,
-    reception_method,
-    instruction,
-    response_require,
-    urgency,
-    observation,
-    reception_date,
-    reception_hour,
-    attachment,
-    status,
-    officeIds,
-  } = req.body;
+// Add this line to serve files from the uploads directory
+router.use('/uploads', express.static('uploads'));
 
-  try {
-    const memo = await prisma.memo.create({
-      data: {
-        id,
-        name,
-        applicant,
-        reception_method,
-        instruction,
-        response_require,
-        urgency,
-        observation,
-        reception_date: reception_date,
-        reception_hour: reception_hour,
-        attachment,
-        status,
-        offices: {
-          create: officeIds.map((officeId) => ({
-            office: {
-              connect: { id: officeId },
-            },
-          })),
-        },
-      },
-    });
-    res.status(201).json(memo);
-  } catch (error) {
-    res.status(400).json({ error: error.message });
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const folder =
+      file.fieldname === 'reception_images' ? 'receptions' : 'attachments';
+    cb(null, `uploads/${folder}`);
+  },
+  filename: function (req, file, cb) {
+    cb(null, `${Date.now()}-${file.originalname}`);
+  },
+});
+
+// Add file filter to validate file types
+const fileFilter = (req, file, cb) => {
+  if (file.fieldname === 'reception_images') {
+    // Allow images and PDFs for reception_images
+    if (
+      file.mimetype.startsWith('image/') ||
+      file.mimetype === 'application/pdf'
+    ) {
+      cb(null, true);
+    } else {
+      cb(
+        new Error('Invalid file type. Only images and PDFs are allowed.'),
+        false
+      );
+    }
+  } else {
+    // For attachment_files, allow all types
+    cb(null, true);
+  }
+};
+
+const upload = multer({
+  storage: storage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  },
+});
+
+// Create upload directories if they don't exist
+['receptions', 'attachments'].forEach((folder) => {
+  const dir = path.join('uploads', folder);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
   }
 });
+
+// Create a new memo
+router.post(
+  '/',
+  (req, res, next) => {
+    upload.fields([
+      { name: 'reception_images', maxCount: 10 },
+      { name: 'attachment_files', maxCount: 10 },
+    ])(req, res, (err) => {
+      if (err) {
+        return res.status(400).json({
+          error: err.message || 'Error uploading files',
+        });
+      }
+      next();
+    });
+  },
+  async (req, res) => {
+    try {
+      const data = JSON.parse(req.body.formData);
+      const { officeIds, ...memoData } = data; // Extract officeIds
+
+      // Process uploaded files
+      const receptionImages = req.files['reception_images']?.map((file) => ({
+        path: file.path,
+        filename: file.filename,
+        type: file.mimetype,
+        isPdf: file.mimetype === 'application/pdf',
+      }));
+
+      const attachmentFiles =
+        req.files['attachment_files']?.map((file) => ({
+          path: file.path,
+          filename: file.filename,
+          type: file.mimetype,
+        })) || [];
+
+      // Create memo with office relationships
+      const memo = await prisma.memo.create({
+        data: {
+          ...memoData,
+          reception_images: receptionImages,
+          attachment_files: attachmentFiles,
+          offices: {
+            create: officeIds.map((officeId) => ({
+              office: {
+                connect: { id: officeId },
+              },
+            })),
+          },
+        },
+        include: {
+          offices: {
+            include: {
+              office: true,
+            },
+          },
+        },
+      });
+
+      res.status(201).json(memo);
+    } catch (error) {
+      console.error(error);
+      res.status(400).json({ error: error.message });
+    }
+  }
+);
 
 router.get('/', async (req, res) => {
   try {
@@ -61,6 +135,10 @@ router.get('/', async (req, res) => {
           },
         },
       },
+      orderBy: [
+        { reception_date: 'desc' }, // Primary sort by reception date
+        { reception_hour: 'desc' }, // Secondary sort by reception hour
+      ],
     });
     res.status(200).json(memos);
   } catch (error) {

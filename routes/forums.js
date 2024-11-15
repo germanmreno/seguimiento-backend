@@ -1,6 +1,8 @@
 import express from 'express';
 import prisma from '../db/prismaClient.js';
 import formatDate from '../helpers/formatDate.js';
+import { upload } from '../utils/uploadConfig.js';
+import path from 'path';
 
 const router = express.Router();
 
@@ -51,20 +53,22 @@ router.get('/:id', async (req, res) => {
     // Extract related offices
     const relatedOffices = memoOffices.map((memoOffice) => memoOffice.office);
 
-    // Fetch memo details separately if memo_id exists
+    // Fetch memo details with reception_images
     let memoDetails = null;
     if (forum.memo_id) {
       const memo = await prisma.memo.findUnique({
         where: { id: forum.memo_id },
         select: {
           urgency: true,
+          reception_images: true,
           // Add more fields here if needed in the future
         },
       });
+
       if (memo) {
         memoDetails = {
           urgencyLevel: memo.urgency,
-          // Add more memo-related fields here if needed in the future
+          reception_images: memo.reception_images || [],
         };
       }
     }
@@ -86,16 +90,20 @@ router.get('/:id', async (req, res) => {
 router.get('/check-existence/:id', async (req, res) => {
   const { id } = req.params;
 
-  console.log(req.params);
-
   try {
     // Check if a forum exists with the given memo_id
     const forum = await prisma.forum.findFirst({
       where: { memo_id: id },
+      select: {
+        id: true,
+        status: true,
+      },
     });
 
     if (forum) {
-      res.status(200).json({ exists: true, id: forum.id });
+      res
+        .status(200)
+        .json({ exists: true, id: forum.id, status: forum.status });
     } else {
       res.status(200).json({ exists: false });
     }
@@ -105,55 +113,49 @@ router.get('/check-existence/:id', async (req, res) => {
   }
 });
 
-// Post a new message to a forum
-router.post('/:forumId/messages', async (req, res) => {
+// Post a new message to a forum with file upload
+router.post('/:forumId/messages', upload.single('file'), async (req, res) => {
   const { forumId } = req.params;
   const { content, user_id } = req.body;
 
+  console.log('Request body:', req.body);
+  console.log('File:', req.file);
+
+  if (!user_id) {
+    return res.status(400).json({ error: 'User ID is required' });
+  }
+
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: user_id },
-      select: {
-        id: true,
-        username: true,
-        firstName: true,
-        lastName: true,
-        office_id: true,
-      },
-    });
-
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
     const message = await prisma.message.create({
       data: {
-        content,
-        user: { connect: { id: user_id } },
-        forum: { connect: { id: parseInt(forumId) } },
+        content: content || '',
+        user: {
+          connect: { id: user_id },
+        },
+        forum: {
+          connect: { id: parseInt(forumId) },
+        },
+        fileUrl: req.file ? `/uploads/${req.file.filename}` : null,
+        fileName: req.file ? req.file.originalname : null,
       },
       include: {
         user: true,
       },
     });
 
-    const office = await prisma.office.findUnique({
-      where: { id: user.office_id },
-    });
-
     const formattedMessage = {
       ...message,
       createdAt: formatDate(message.createdAt),
-      user: {
-        ...message.user,
-        office: office,
-      },
     };
 
     res.status(201).json(formattedMessage);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to post message' });
+    console.error('Error creating message:', error);
+    res.status(500).json({
+      error: 'Failed to create message',
+      details: error.message,
+      requestData: { content, user_id, forumId, file: req.file },
+    });
   }
 });
 
@@ -248,6 +250,12 @@ router.delete('/:forumId/messages/:messageId', async (req, res) => {
     console.error(error);
     res.status(500).json({ error: 'Failed to delete message' });
   }
+});
+
+// Add a route to serve uploaded files
+router.get('/uploads/:filename', (req, res) => {
+  const { filename } = req.params;
+  res.sendFile(path.join(__dirname, '../uploads', filename));
 });
 
 export default router;

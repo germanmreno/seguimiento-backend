@@ -7,22 +7,10 @@ const router = express.Router();
 
 // User Registration
 router.post('/register', async (req, res) => {
-  const { ci, username, password, firstName, lastName, office_id, role } =
-    req.body;
-
   try {
-    // Check if user already exists
-    const existingUser = await prisma.user.findFirst({
-      where: {
-        OR: [{ ci }, { username }],
-      },
-    });
+    const { ci, username, password, firstName, lastName, office_id } = req.body;
 
-    if (existingUser) {
-      return res.status(400).json({ error: 'User already exists' });
-    }
-
-    // Check if the office exists
+    // Validate if office exists
     const office = await prisma.office.findUnique({
       where: { id: office_id },
     });
@@ -31,30 +19,43 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: 'Invalid office ID' });
     }
 
-    // Hash the password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+    // Check if user already exists
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        OR: [{ ci }, { username }],
+      },
+    });
 
-    // Create new user
-    const newUser = await prisma.user.create({
+    if (existingUser) {
+      return res.status(400).json({
+        error: 'User with this CI or username already exists',
+      });
+    }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Create user
+    const user = await prisma.user.create({
       data: {
-        id: Math.random().toString(36).substr(2, 9), // Generate a random ID
+        id: crypto.randomUUID(), // Generate a unique ID
         ci,
         username,
         password: hashedPassword,
         firstName,
         lastName,
         office_id,
-        role: role || 'USER',
+        role: 'USER', // Default role, or you can pass it in the request
       },
     });
 
-    res
-      .status(201)
-      .json({ message: 'User created successfully', userId: newUser.id });
+    // Remove password from response
+    const { password: _, ...userWithoutPassword } = user;
+
+    res.status(201).json(userWithoutPassword);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to create user' });
+    console.error('Registration error:', error);
+    res.status(400).json({ error: error.message });
   }
 });
 

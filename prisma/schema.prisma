@@ -52,10 +52,12 @@ model Memo {
   observation      String
   reception_date   DateTime @db.Date
   reception_hour   String
-  attachment       Json
-  status           String   @default("PENDING")
-  created_at       DateTime @default(now())
-  updated_at       DateTime @default(now()) @updatedAt
+  reception_images Json     // Array of reception proof images
+  attachment_type  Json     // Store array as JSON string
+  attachment_files Json?    // Optional array of attachment files
+  status          String   @default("PENDING")
+  created_at      DateTime @default(now())
+  updated_at      DateTime @default(now()) @updatedAt
 
   offices MemoOffice[]
   forums  Forum[]
