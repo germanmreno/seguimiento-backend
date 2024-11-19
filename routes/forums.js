@@ -34,6 +34,17 @@ router.get('/:id', async (req, res) => {
     // Fetch the forum entry by ID
     const forum = await prisma.forum.findUnique({
       where: { id: parseInt(id) },
+      include: {
+        messages: {
+          orderBy: {
+            createdAt: 'desc',
+          },
+          take: 1,
+          select: {
+            createdAt: true,
+          },
+        },
+      },
     });
 
     console.log(forum);
@@ -61,7 +72,8 @@ router.get('/:id', async (req, res) => {
         select: {
           urgency: true,
           reception_images: true,
-          // Add more fields here if needed in the future
+          attachment_files: true,
+          instruction: true,
         },
       });
 
@@ -69,6 +81,8 @@ router.get('/:id', async (req, res) => {
         memoDetails = {
           urgencyLevel: memo.urgency,
           reception_images: memo.reception_images || [],
+          attachment_files: memo.attachment_files || [],
+          instruction: memo.instruction,
         };
       }
     }
@@ -78,6 +92,10 @@ router.get('/:id', async (req, res) => {
       ...forum,
       relatedOffices,
       memoDetails,
+      messageCount: await prisma.message.count({
+        where: { forum_id: parseInt(id) },
+      }),
+      lastMessageAt: forum.messages[0]?.createdAt || null,
     };
 
     res.status(200).json(response);
@@ -97,13 +115,25 @@ router.get('/check-existence/:id', async (req, res) => {
       select: {
         id: true,
         status: true,
+        messages: {
+          orderBy: {
+            createdAt: 'desc',
+          },
+          take: 1,
+          select: {
+            createdAt: true,
+          },
+        },
       },
     });
 
     if (forum) {
-      res
-        .status(200)
-        .json({ exists: true, id: forum.id, status: forum.status });
+      res.status(200).json({
+        exists: true,
+        id: forum.id,
+        status: forum.status,
+        lastMessageAt: forum.messages[0]?.createdAt || null,
+      });
     } else {
       res.status(200).json({ exists: false });
     }
