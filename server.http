@@ -12,6 +12,34 @@ Content-Type: application/json
   "office_id": "100"
 }
 
+### Register admin user
+POST http://localhost:3000/auth/register
+Content-Type: application/json
+
+{
+  "ci": "12345678",
+  "username": "ADMIN",
+  "password": "admin123",
+  "firstName": "Admin",
+  "lastName": "User",
+  "office_id": "100",
+  "role": "ADMIN"
+}
+
+### Register consultoria user
+POST http://localhost:3000/auth/register
+Content-Type: application/json
+
+{
+  "ci": "20200200",
+  "username": "CONSULTORIA",
+  "password": "consultoria123",
+  "firstName": "Consultoria",
+  "lastName": "User",
+  "office_id": "103",
+  "role": "USER"
+}
+
 ###
 POST http://localhost:3000/auth/login
 Content-Type: application/json

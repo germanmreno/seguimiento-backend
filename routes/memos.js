@@ -76,16 +76,33 @@ router.post(
   },
   async (req, res) => {
     try {
-      const data = JSON.parse(req.body.formData);
-      const { officeIds, ...memoData } = data; // Extract officeIds
+      const {
+        id,
+        name,
+        applicant,
+        reception_method,
+        reception_date,
+        reception_hour,
+        response_require,
+        observation,
+        status,
+        urgency,
+        attachment_type,
+        officeIds,
+      } = req.body;
+
+      // Parse JSON strings back to arrays
+      const parsedAttachmentType = JSON.parse(attachment_type);
+      const parsedOfficeIds = JSON.parse(officeIds);
 
       // Process uploaded files
-      const receptionImages = req.files['reception_images']?.map((file) => ({
-        path: file.path,
-        filename: file.filename,
-        type: file.mimetype,
-        isPdf: file.mimetype === 'application/pdf',
-      }));
+      const receptionImages =
+        req.files['reception_images']?.map((file) => ({
+          path: file.path,
+          filename: file.filename,
+          type: file.mimetype,
+          isPdf: file.mimetype === 'application/pdf',
+        })) || [];
 
       const attachmentFiles =
         req.files['attachment_files']?.map((file) => ({
@@ -97,16 +114,27 @@ router.post(
       // Create memo with office relationships
       const memo = await prisma.memo.create({
         data: {
-          ...memoData,
+          id,
+          name,
+          applicant,
+          reception_method,
+          reception_date: new Date(reception_date),
+          reception_hour,
+          response_require,
+          observation,
+          status,
+          urgency,
+          attachment_type: parsedAttachmentType,
           reception_images: receptionImages,
           attachment_files: attachmentFiles,
           offices: {
-            create: officeIds.map((officeId) => ({
+            create: parsedOfficeIds.map((officeId) => ({
               office: {
                 connect: { id: officeId },
               },
             })),
           },
+          instruction_status: 'PENDING',
         },
         include: {
           offices: {
@@ -124,6 +152,33 @@ router.post(
     }
   }
 );
+
+// Add this new route to get a single memo by ID
+router.get('/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const memo = await prisma.memo.findUnique({
+      where: { id },
+      include: {
+        offices: {
+          include: {
+            office: true,
+          },
+        },
+      },
+    });
+
+    if (!memo) {
+      return res.status(404).json({ error: 'Memo not found' });
+    }
+
+    res.status(200).json(memo);
+  } catch (error) {
+    console.error('Error fetching memo:', error);
+    res.status(500).json({ error: 'Failed to fetch memo' });
+  }
+});
 
 router.get('/', async (req, res) => {
   try {
@@ -166,6 +221,27 @@ router.patch('/:id/status', async (req, res) => {
   } catch (error) {
     console.error('Failed to change status:', error);
     res.status(500).json({ error: 'Failed to change status' });
+  }
+});
+
+// Add this new route
+router.patch('/:id/instruction', async (req, res) => {
+  const { id } = req.params;
+  const { instruction } = req.body;
+
+  try {
+    const updatedMemo = await prisma.memo.update({
+      where: { id },
+      data: {
+        instruction,
+        instruction_status: 'ASSIGNED',
+      },
+    });
+
+    res.status(200).json(updatedMemo);
+  } catch (error) {
+    console.error('Failed to update instruction:', error);
+    res.status(500).json({ error: 'Failed to update instruction' });
   }
 });
 

@@ -11,7 +11,7 @@ router.post('/', async (req, res) => {
   const { title, description, memo_id } = req.body;
 
   try {
-    // Insert the new Forum entry
+    // Create the forum
     const newForum = await prisma.forum.create({
       data: {
         title,
@@ -19,6 +19,39 @@ router.post('/', async (req, res) => {
         memo_id,
       },
     });
+
+    // Get related offices and users
+    const memoOffices = await prisma.memoOffice.findMany({
+      where: { memo_id },
+      include: {
+        office: true,
+      },
+    });
+
+    // Get all users from related offices
+    const users = await prisma.user.findMany({
+      where: {
+        office_id: {
+          in: memoOffices.map((mo) => mo.office_id),
+        },
+      },
+    });
+
+    // Create notifications for each user
+    const notifications = await Promise.all(
+      users.map((user) =>
+        prisma.notification.create({
+          data: {
+            user_id: user.id,
+            forum_id: newForum.id,
+            message:
+              user.role === 'ADMIN'
+                ? `Nuevo foro creado: ${title}`
+                : `Nuevo foro relacionado con tu oficina: ${title}`,
+          },
+        })
+      )
+    );
 
     res.status(201).json(newForum);
   } catch (error) {

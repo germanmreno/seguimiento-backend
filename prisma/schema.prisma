@@ -28,6 +28,7 @@ model User {
   role      Role      @default(USER)
   office_id String
   messages  Message[]
+  notifications Notification[]
 
   @@map("user")
 }
@@ -41,23 +42,29 @@ model Office {
   @@map("offices")
 }
 
+enum InstructionStatus {
+  PENDING
+  ASSIGNED
+}
+
 model Memo {
-  id               String   @id
+  id               String            @id
   name             String
   applicant        String
   reception_method String
-  instruction      String
+  instruction      String?           // Make it optional
+  instruction_status InstructionStatus @default(PENDING)  // Add this field
   response_require String
   urgency          String?
   observation      String
-  reception_date   DateTime @db.Date
+  reception_date   DateTime          @db.Date
   reception_hour   String
-  reception_images Json     // Array of reception proof images
-  attachment_type  Json     // Store array as JSON string
-  attachment_files Json?    // Optional array of attachment files
-  status          String   @default("PENDING")
-  created_at      DateTime @default(now())
-  updated_at      DateTime @default(now()) @updatedAt
+  reception_images Json              // Array of reception proof images
+  attachment_type  Json              // Store array as JSON string
+  attachment_files Json?             // Optional array of attachment files
+  status          String            @default("PENDING")
+  created_at      DateTime          @default(now())
+  updated_at      DateTime          @default(now()) @updatedAt
 
   offices MemoOffice[]
   forums  Forum[]
@@ -71,14 +78,15 @@ enum ForumStatus {
 }
 
 model Forum {
-  id          Int         @id @default(autoincrement())
-  title       String
-  description String
-  memo_id     String
-  status      ForumStatus @default(OPEN)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt @default(now())
-  messages    Message[]
+  id            Int            @id @default(autoincrement())
+  title         String
+  description   String
+  memo_id       String
+  status        ForumStatus    @default(OPEN)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt @default(now())
+  messages      Message[]
+  notifications Notification[]
 
   memo Memo @relation(fields: [memo_id], references: [id])
 
@@ -109,4 +117,19 @@ model MemoOffice {
 
   @@id([memo_id, office_id])
   @@map("memos_offices")
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  user_id   String
+  forum_id  Int
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  deleted   Boolean  @default(false)
+
+  user  User  @relation(fields: [user_id], references: [id])
+  forum Forum @relation(fields: [forum_id], references: [id])
+
+  @@map("notifications")
 }

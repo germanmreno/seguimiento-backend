@@ -8,7 +8,8 @@ const router = express.Router();
 // User Registration
 router.post('/register', async (req, res) => {
   try {
-    const { ci, username, password, firstName, lastName, office_id } = req.body;
+    const { ci, username, password, firstName, lastName, office_id, role } =
+      req.body;
 
     // Validate if office exists
     const office = await prisma.office.findUnique({
@@ -35,7 +36,7 @@ router.post('/register', async (req, res) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create user
+    // Create user with optional role parameter
     const user = await prisma.user.create({
       data: {
         id: crypto.randomUUID(), // Generate a unique ID
@@ -45,7 +46,7 @@ router.post('/register', async (req, res) => {
         firstName,
         lastName,
         office_id,
-        role: 'USER', // Default role, or you can pass it in the request
+        role: role || 'USER', // Use provided role or default to USER
       },
     });
 
@@ -110,4 +111,38 @@ router.post('/login', async (req, res) => {
   }
 });
 
+export const authenticateToken = async (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ error: 'Access token required' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Get full user details from database
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      select: {
+        id: true,
+        username: true,
+        role: true,
+        office_id: true,
+      },
+    });
+
+    if (!user) {
+      return res.status(401).json({ error: 'User not found' });
+    }
+
+    req.user = user;
+    next();
+  } catch (error) {
+    return res.status(403).json({ error: 'Invalid or expired token' });
+  }
+};
+
+// Export only the router as default
 export default router;

@@ -3,10 +3,12 @@ import cors from 'cors';
 import memosRouter from './routes/memos.js';
 import forumRouter from './routes/forums.js';
 import authRoutes from './routes/auth.js';
+import notificationsRouter from './routes/notifications.js';
 import prisma from './db/prismaClient.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import officesRouter from './routes/offices.js';
 
 const app = express();
 const __filename = fileURLToPath(import.meta.url);
@@ -52,6 +54,8 @@ app.use(
 app.use('/memos', memosRouter);
 app.use('/forums', forumRouter);
 app.use('/auth', authRoutes);
+app.use('/notifications', notificationsRouter);
+app.use('/offices', officesRouter);
 
 // Error handling for file serving
 app.use((err, req, res, next) => {
