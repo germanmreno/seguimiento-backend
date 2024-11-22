@@ -58,6 +58,11 @@ const upload = multer({
   }
 });
 
+const SERVER_URL =
+  process.env.NODE_ENV === 'production'
+    ? 'http://172.16.2.51:3005'
+    : 'http://localhost:3005';
+
 // Create a new memo
 router.post(
   '/',
@@ -98,7 +103,7 @@ router.post(
       // Process uploaded files
       const receptionImages =
         req.files['reception_images']?.map((file) => ({
-          path: file.path,
+          path: `${SERVER_URL}/${file.path}`,
           filename: file.filename,
           type: file.mimetype,
           isPdf: file.mimetype === 'application/pdf',
@@ -106,7 +111,7 @@ router.post(
 
       const attachmentFiles =
         req.files['attachment_files']?.map((file) => ({
-          path: file.path,
+          path: `${SERVER_URL}/${file.path}`,
           filename: file.filename,
           type: file.mimetype,
         })) || [];

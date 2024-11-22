@@ -12,6 +12,20 @@ Content-Type: application/json
   "office_id": "100"
 }
 
+### Register a new user in real server
+POST http://172.16.2.51:3005/api/auth/register
+Content-Type: application/json
+
+{
+  "ci": "12345678",
+  "username": "ADMIN",
+  "password": "admin123",
+  "firstName": "Admin",
+  "lastName": "User",
+  "office_id": "100",
+  "role": "ADMIN"
+}
+
 ### Register admin user
 POST http://localhost:3000/auth/register
 Content-Type: application/json
