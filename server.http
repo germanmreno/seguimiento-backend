@@ -1,0 +1,78 @@
+###
+# Register a new user
+POST http://localhost:3000/auth/register
+Content-Type: application/json
+
+{
+  "ci": "27376360",
+  "username": "ADMIN4",
+  "password": "1234567",
+  "firstName": "German",
+  "lastName": "Tecnología",
+  "office_id": "100"
+}
+
+### Register admin user
+POST http://localhost:3000/auth/register
+Content-Type: application/json
+
+{
+  "ci": "12345678",
+  "username": "ADMIN",
+  "password": "admin123",
+  "firstName": "Admin",
+  "lastName": "User",
+  "office_id": "100",
+  "role": "ADMIN"
+}
+
+### Register consultoria user
+POST http://localhost:3000/auth/register
+Content-Type: application/json
+
+{
+  "ci": "20200200",
+  "username": "CONSULTORIA",
+  "password": "consultoria123",
+  "firstName": "Consultoria",
+  "lastName": "User",
+  "office_id": "103",
+  "role": "USER"
+}
+
+###
+POST http://localhost:3000/auth/login
+Content-Type: application/json
+
+{
+  "username": "ADMIN4",
+  "password": "1234567"
+}
+
+###
+POST http://localhost:3000/auth/register
+Content-Type: application/json
+
+{
+  "ci": "10100100",
+  "username": "DESIREEPEREZ",
+  "password": "1234567",
+  "firstName": "Desiree",
+  "lastName": "Perez",
+  "office_id": "100"
+}
+
+###
+POST http://localhost:3000/auth/register
+Content-Type: application/json
+
+{
+  "ci": "20200200",
+  "username": "GERMANTECNOLOGIA",
+  "password": "1234567",
+  "firstName": "German",
+  "lastName": "Moreno",
+  "office_id": "100"
+}
+
+
