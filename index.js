@@ -51,11 +51,19 @@ app.use(
 );
 
 // Routes
-app.use('/memos', memosRouter);
-app.use('/forums', forumRouter);
-app.use('/auth', authRoutes);
-app.use('/notifications', notificationsRouter);
-app.use('/offices', officesRouter);
+app.use('/api/memos', memosRouter);
+app.use('/api/forums', forumRouter);
+app.use('/api/auth', authRoutes);
+app.use('/api/notifications', notificationsRouter);
+app.use('/api/offices', officesRouter);
+
+// Serve static files from the dist folder
+app.use(express.static(path.join(__dirname, 'dist')));
+
+// Handle React routing, return all requests to React app
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+});
 
 // Error handling for file serving
 app.use((err, req, res, next) => {
@@ -66,7 +74,7 @@ app.use((err, req, res, next) => {
   }
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3005;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
