@@ -3,54 +3,81 @@ import prisma from '../db/prismaClient.js';
 import formatDate from '../helpers/formatDate.js';
 import { upload } from '../utils/uploadConfig.js';
 import path from 'path';
+import {
+  sendNotifications,
+  getSpecialUsers,
+} from '../utils/notificationHelper.js';
 
 const router = express.Router();
 
 // Create a new forum entry
 router.post('/', async (req, res) => {
-  const { title, description, memo_id } = req.body;
+  const { title, description, memo_id, user_id } = req.body;
 
   try {
-    // Create the forum
+    // Check if user has access to the memo
+    const memo = await prisma.memo.findUnique({
+      where: { id: memo_id },
+      include: {
+        offices: {
+          include: {
+            office: true,
+          },
+        },
+      },
+    });
+
+    if (!memo) {
+      return res.status(404).json({ error: 'Memo not found' });
+    }
+
+    // Check if user's office is related to the memo
+    const userHasAccess = memo.offices.some(
+      (office) => office.office_id === user_id.office_id
+    );
+
+    if (!userHasAccess && user_id.role !== 'ADMIN') {
+      return res.status(403).json({
+        error: 'No tienes permiso para crear un foro para este oficio',
+      });
+    }
+
+    // Create the forum with creator information
     const newForum = await prisma.forum.create({
       data: {
         title,
         description,
         memo_id,
+        created_by: user_id.id,
       },
-    });
-
-    // Get related offices and users
-    const memoOffices = await prisma.memoOffice.findMany({
-      where: { memo_id },
       include: {
-        office: true,
-      },
-    });
-
-    // Get all users from related offices
-    const users = await prisma.user.findMany({
-      where: {
-        office_id: {
-          in: memoOffices.map((mo) => mo.office_id),
+        creator: true,
+        memo: {
+          include: {
+            offices: true,
+          },
         },
       },
     });
 
-    // Create notifications for each user
-    const notifications = await Promise.all(
-      users.map((user) =>
-        prisma.notification.create({
-          data: {
-            user_id: user.id,
-            forum_id: newForum.id,
-            message:
-              user.role === 'ADMIN'
-                ? `Nuevo foro creado: ${title}`
-                : `Nuevo foro relacionado con tu oficina: ${title}`,
-          },
-        })
-      )
+    // Get users from related offices
+    const relatedUsers = await prisma.user.findMany({
+      where: {
+        office_id: {
+          in: newForum.memo.offices.map((o) => o.office_id),
+        },
+      },
+    });
+
+    const specialUsers = await getSpecialUsers();
+
+    // Combine and deduplicate users
+    const allUsers = [...new Set([...relatedUsers, ...specialUsers])];
+
+    await sendNotifications(
+      allUsers,
+      `Nuevo foro creado: ${title}`,
+      newForum.id
     );
 
     res.status(201).json(newForum);
@@ -178,27 +205,46 @@ router.get('/check-existence/:id', async (req, res) => {
 
 // Post a new message to a forum with file upload
 router.post('/:forumId/messages', upload.single('file'), async (req, res) => {
-  const { forumId } = req.params;
-  const { content, user_id } = req.body;
-
-  console.log('Request body:', req.body);
-  console.log('File:', req.file);
-
-  if (!user_id) {
-    return res.status(400).json({ error: 'User ID is required' });
-  }
-
   try {
+    const { forumId } = req.params;
+    const { content, user_id } = req.body;
+
+    // Get user and office information
+    const user = await prisma.user.findUnique({
+      where: { id: user_id },
+    });
+
+    const office = await prisma.office.findUnique({
+      where: { id: user.office_id },
+    });
+
+    // First get the forum with memo information and related offices
+    const forum = await prisma.forum.findUnique({
+      where: { id: parseInt(forumId) },
+      include: {
+        memo: {
+          include: {
+            offices: {
+              include: {
+                office: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!forum) {
+      return res.status(404).json({ error: 'Forum not found' });
+    }
+
+    // Create the message
     const message = await prisma.message.create({
       data: {
-        content: content || '',
-        user: {
-          connect: { id: user_id },
-        },
-        forum: {
-          connect: { id: parseInt(forumId) },
-        },
-        fileUrl: req.file ? `/uploads/${req.file.filename}` : null,
+        content,
+        user_id,
+        forum_id: parseInt(forumId),
+        fileUrl: req.file ? `/${req.file.path}` : null,
         fileName: req.file ? req.file.originalname : null,
       },
       include: {
@@ -206,18 +252,41 @@ router.post('/:forumId/messages', upload.single('file'), async (req, res) => {
       },
     });
 
-    const formattedMessage = {
-      ...message,
-      createdAt: formatDate(message.createdAt),
-    };
+    // Get users from related offices
+    const relatedUsers = await prisma.user.findMany({
+      where: {
+        office_id: {
+          in: forum.memo.offices.map((o) => o.office_id),
+        },
+      },
+    });
 
-    res.status(201).json(formattedMessage);
+    // Get special users (ADMIN, PRESIDENCIA, VICEPRESIDENCIA, SEGUIMIENTO Y CONTROL)
+    const specialUsers = await getSpecialUsers();
+
+    // Combine and deduplicate users, excluding the message sender
+    const allUsers = [...new Set([...relatedUsers, ...specialUsers])].filter(
+      (u) => u.id !== user_id
+    );
+
+    // Create a more descriptive notification message
+    const notificationMessage = `${user.username} (${office.name}) comentó en el foro: ${forum.title}`;
+
+    // Send notifications
+    await sendNotifications(
+      allUsers,
+      notificationMessage,
+      parseInt(forumId),
+      forum.memo.id
+    );
+
+    res.status(201).json(message);
   } catch (error) {
     console.error('Error creating message:', error);
     res.status(500).json({
       error: 'Failed to create message',
       details: error.message,
-      requestData: { content, user_id, forumId, file: req.file },
+      requestData: req.body,
     });
   }
 });

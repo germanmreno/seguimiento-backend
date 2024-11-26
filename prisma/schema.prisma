@@ -29,6 +29,7 @@ model User {
   office_id String
   messages  Message[]
   notifications Notification[]
+  createdForums Forum[]   @relation("ForumCreator")
 
   @@map("user")
 }
@@ -68,6 +69,7 @@ model Memo {
 
   offices MemoOffice[]
   forums  Forum[]
+  notifications Notification[]
 
   @@map("memos")
 }
@@ -82,13 +84,15 @@ model Forum {
   title         String
   description   String
   memo_id       String
+  created_by    String        @default("1178d681-8b9c-4ac2-bd9f-b11b0985ff94")
   status        ForumStatus    @default(OPEN)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt @default(now())
   messages      Message[]
   notifications Notification[]
 
-  memo Memo @relation(fields: [memo_id], references: [id])
+  memo    Memo @relation(fields: [memo_id], references: [id])
+  creator User @relation(name: "ForumCreator", fields: [created_by], references: [id])
 
   @@map("forums")
 }
@@ -122,14 +126,16 @@ model MemoOffice {
 model Notification {
   id        Int      @id @default(autoincrement())
   user_id   String
-  forum_id  Int
+  forum_id  Int?     // Make forum_id optional
+  memo_id   String?  // Add memo_id field
   message   String
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
   deleted   Boolean  @default(false)
 
   user  User  @relation(fields: [user_id], references: [id])
-  forum Forum @relation(fields: [forum_id], references: [id])
+  forum Forum? @relation(fields: [forum_id], references: [id])
+  memo  Memo?  @relation(fields: [memo_id], references: [id])
 
   @@map("notifications")
 }

@@ -3,6 +3,10 @@ import prisma from '../db/prismaClient.js';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import {
+  sendNotifications,
+  getSpecialUsers,
+} from '../utils/notificationHelper.js';
 
 const router = express.Router();
 
@@ -14,7 +18,8 @@ const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     const folder =
       file.fieldname === 'reception_images' ? 'receptions' : 'attachments';
-    cb(null, `uploads/${folder}`);
+    const uploadPath = path.join('uploads', folder).replace(/\\/g, '/');
+    cb(null, uploadPath);
   },
   filename: function (req, file, cb) {
     cb(null, `${Date.now()}-${file.originalname}`);
@@ -98,7 +103,7 @@ router.post(
       // Process uploaded files
       const receptionImages =
         req.files['reception_images']?.map((file) => ({
-          path: `/${file.path}`,
+          path: file.path.replace(/\\/g, '/'),
           filename: file.filename,
           type: file.mimetype,
           isPdf: file.mimetype === 'application/pdf',
@@ -106,7 +111,7 @@ router.post(
 
       const attachmentFiles =
         req.files['attachment_files']?.map((file) => ({
-          path: `/${file.path}`,
+          path: file.path.replace(/\\/g, '/'),
           filename: file.filename,
           type: file.mimetype,
         })) || [];
@@ -145,6 +150,26 @@ router.post(
         },
       });
 
+      // Send notifications to related users
+      const relatedUsers = await prisma.user.findMany({
+        where: {
+          office_id: {
+            in: parsedOfficeIds,
+          },
+        },
+      });
+
+      const specialUsers = await getSpecialUsers();
+      const allUsers = [...new Set([...relatedUsers, ...specialUsers])];
+
+      // Add notification for new memo creation
+      await sendNotifications(
+        allUsers,
+        `Nuevo oficio registrado: ${memo.name}`,
+        null, // No forum ID
+        memo.id // Add the memo ID here
+      );
+
       res.status(201).json(memo);
     } catch (error) {
       console.error(error);
@@ -182,7 +207,18 @@ router.get('/:id', async (req, res) => {
 
 router.get('/', async (req, res) => {
   try {
+    const { office_id } = req.query;
+
     const memos = await prisma.memo.findMany({
+      where: office_id
+        ? {
+            offices: {
+              some: {
+                office_id: office_id,
+              },
+            },
+          }
+        : undefined,
       include: {
         offices: {
           include: {
@@ -190,10 +226,7 @@ router.get('/', async (req, res) => {
           },
         },
       },
-      orderBy: [
-        { reception_date: 'desc' }, // Primary sort by reception date
-        { reception_hour: 'desc' }, // Secondary sort by reception hour
-      ],
+      orderBy: [{ reception_date: 'desc' }, { reception_hour: 'desc' }],
     });
     res.status(200).json(memos);
   } catch (error) {
@@ -203,17 +236,32 @@ router.get('/', async (req, res) => {
 
 router.patch('/:id/status', async (req, res) => {
   const { id } = req.params;
-  const { status } = req.body;
+  const { status, user } = req.body;
 
-  if (!['PENDING', 'COMPLETED'].includes(status)) {
+  if (!user) {
+    return res.status(400).json({
+      error: 'User information is required',
+    });
+  }
+
+  // Update valid status values
+  if (!['PENDING', 'COMPLETED', 'ARCHIVED'].includes(status)) {
     return res.status(400).json({ error: 'Invalid status value' });
   }
 
-  console.log(id, status);
+  // Check user permissions
+  const canChangeStatus =
+    user.role === 'ADMIN' || (user.office_id === '110' && user.role === 'USER');
+
+  if (!canChangeStatus) {
+    return res.status(403).json({
+      error: 'No tienes permisos para cambiar el estado del oficio',
+    });
+  }
 
   try {
     const updatedMemo = await prisma.memo.update({
-      where: { id: id },
+      where: { id },
       data: { status },
     });
 
@@ -224,19 +272,68 @@ router.patch('/:id/status', async (req, res) => {
   }
 });
 
-// Add this new route
+// Update the instruction route to handle office updates
 router.patch('/:id/instruction', async (req, res) => {
   const { id } = req.params;
-  const { instruction } = req.body;
+  const { instruction, officeIds, user } = req.body;
+
+  // Check if user has permission to edit offices
+  const canEditOffices = user.role === 'ADMIN' || user.office_id === '101'; // VICEPRESIDENCIA
 
   try {
+    const updateData = {
+      instruction,
+      instruction_status: 'ASSIGNED',
+    };
+
+    // Only update offices if user has permission and officeIds were provided
+    if (canEditOffices && officeIds) {
+      // Delete existing office relationships
+      await prisma.memoOffice.deleteMany({
+        where: { memo_id: id },
+      });
+
+      // Create new office relationships
+      await prisma.memoOffice.createMany({
+        data: officeIds.map((officeId) => ({
+          memo_id: id,
+          office_id: officeId,
+        })),
+      });
+    }
+
     const updatedMemo = await prisma.memo.update({
       where: { id },
-      data: {
-        instruction,
-        instruction_status: 'ASSIGNED',
+      data: updateData,
+      include: {
+        offices: {
+          include: {
+            office: true,
+          },
+        },
       },
     });
+
+    // Send notifications to related users
+    const relatedUsers = await prisma.user.findMany({
+      where: {
+        office_id: {
+          in: officeIds,
+        },
+      },
+    });
+
+    const specialUsers = await getSpecialUsers();
+
+    // Combine and deduplicate users
+    const allUsers = [...new Set([...relatedUsers, ...specialUsers])];
+
+    await sendNotifications(
+      allUsers,
+      `Nuevo oficio asignado: ${updatedMemo.name}`,
+      null, // No forum ID for memo notifications
+      id // Add the memo ID here
+    );
 
     res.status(200).json(updatedMemo);
   } catch (error) {

@@ -91,7 +91,7 @@ router.post('/login', async (req, res) => {
     const token = jwt.sign(
       { userId: user.id, username: user.username, role: user.role },
       process.env.JWT_SECRET,
-      { expiresIn: '1h' }
+      { expiresIn: '7d' }
     );
 
     res.json({
@@ -108,6 +108,53 @@ router.post('/login', async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+// Add this new endpoint
+router.post('/refresh-token', async (req, res) => {
+  const { token } = req.body;
+
+  if (!token) {
+    return res.status(400).json({ error: 'Token is required' });
+  }
+
+  try {
+    // Verify existing token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET, {
+      ignoreExpiration: true,
+    });
+
+    // Get user data
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Generate new token
+    const newToken = jwt.sign(
+      { userId: user.id, username: user.username, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.json({
+      token: newToken,
+      user: {
+        id: user.id,
+        username: user.username,
+        role: user.role,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        office_id: user.office_id,
+      },
+    });
+  } catch (error) {
+    console.error('Token refresh error:', error);
+    res.status(401).json({ error: 'Invalid token' });
   }
 });
 
