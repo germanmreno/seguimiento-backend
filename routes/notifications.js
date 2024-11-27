@@ -18,6 +18,20 @@ router.get('/', async (req, res) => {
           select: {
             title: true,
             memo_id: true,
+            memo: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+        memo: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
+            instruction: true,
           },
         },
       },
@@ -28,6 +42,7 @@ router.get('/', async (req, res) => {
 
     res.json(notifications);
   } catch (error) {
+    console.error('Error fetching notifications:', error);
     res.status(500).json({ error: 'Failed to fetch notifications' });
   }
 });
