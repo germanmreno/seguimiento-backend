@@ -139,3 +139,55 @@ model Notification {
 
   @@map("notifications")
 }
+
+model SentMemo {
+  id             String   @id @default(uuid())
+  title          String
+  registeredBy   String
+  registerDate   DateTime @default(now())
+  receptionImage String   // Path to the image
+  pdfWithQR      String?  // Path to the generated PDF with QR
+  qrCode         String?  // Path to the QR code image
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("sent_memos")
+}
+
+model PuntoCuenta {
+  id           String   @id @default(uuid())
+  numero       String   @unique  // NRO. PUNTO
+  tipo         String   // TIPO
+  fecha        DateTime @db.Date
+  presentante  String   // PRESENTANTE
+  asunto       String   // ASUNTO
+  decision     String   // DECISIÓN
+  observacion  String   // OBSERVACIONES
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  @@map("puntos_cuenta")
+}
+
+enum OficioStatus {
+  FINALIZADO
+  PENDIENTE
+}
+
+model OficioPresidencia {
+  id                String       @id @default(uuid())
+  numero            String       @unique  // NRO. OFICIO
+  elaboradoPor      String       // ELABORADO POR
+  institucion       String       // INSTITUCIÓN
+  destinatario      String       // DESTINATARIO
+  asunto            String       // ASUNTO
+  fechaElaboracion  DateTime     @db.Date  // FECHA ELABORACIÓN
+  fechaEntrega      DateTime     @db.Date  // FECHA ENTREGA
+  requiereRespuesta Boolean      // REQUIERE RESPUESTA
+  status            OficioStatus @default(PENDIENTE)  // ESTATUS
+  documento_escaneado String?    // Path to scanned document
+  created_at        DateTime     @default(now())
+  updated_at        DateTime     @updatedAt
+
+  @@map("oficios_presidencia")
+}

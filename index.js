@@ -9,13 +9,22 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import officesRouter from './routes/offices.js';
+import sentMemosRouter from './routes/sentMemos.js';
+import puntosCuentaRouter from './routes/puntosCuenta.js';
+import oficiosPresidenciaRouter from './routes/oficiosPresidencia.js';
 
 const app = express();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Create upload directories if they don't exist
-const uploadDirs = ['uploads/receptions', 'uploads/attachments'];
+const uploadDirs = [
+  'uploads/receptions',
+  'uploads/attachments',
+  'uploads/sent-memos',
+  'uploads/qr-codes',
+  'uploads/pdfs-with-qr',
+];
 uploadDirs.forEach((dir) => {
   const fullPath = path.join(__dirname, dir);
   if (!fs.existsSync(fullPath)) {
@@ -56,6 +65,9 @@ app.use('/api/forums', forumRouter);
 app.use('/api/auth', authRoutes);
 app.use('/api/notifications', notificationsRouter);
 app.use('/api/offices', officesRouter);
+app.use('/api/sent-memos', sentMemosRouter);
+app.use('/api/puntos-cuenta', puntosCuentaRouter);
+app.use('/api/oficios-presidencia', oficiosPresidenciaRouter);
 
 // Serve static files from the dist folder
 app.use(express.static(path.join(__dirname, 'dist')));
