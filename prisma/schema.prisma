@@ -154,17 +154,24 @@ model SentMemo {
   @@map("sent_memos")
 }
 
+enum DecisionStatus {
+  PENDIENTE
+  APROBADO
+  RECHAZADO
+}
+
 model PuntoCuenta {
-  id           String   @id @default(uuid())
-  numero       String   @unique  // NRO. PUNTO
-  tipo         String   // TIPO
-  fecha        DateTime @db.Date
-  presentante  String   // PRESENTANTE
-  asunto       String   // ASUNTO
-  decision     String   // DECISIÓN
-  observacion  String   // OBSERVACIONES
-  created_at   DateTime @default(now())
-  updated_at   DateTime @updatedAt
+  id           String        @id @default(uuid())
+  numero       String        @unique
+  tipo         String
+  fecha        DateTime      @db.Date
+  presentante  Json
+  asunto       String
+  decision     DecisionStatus @default(PENDIENTE)
+  observacion  String
+  documento_escaneado String?
+  created_at   DateTime     @default(now())
+  updated_at   DateTime     @updatedAt
 
   @@map("puntos_cuenta")
 }

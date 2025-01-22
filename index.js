@@ -24,6 +24,8 @@ const uploadDirs = [
   'uploads/sent-memos',
   'uploads/qr-codes',
   'uploads/pdfs-with-qr',
+  'uploads/puntos-cuenta',
+  'uploads/oficios-presidencia',
 ];
 uploadDirs.forEach((dir) => {
   const fullPath = path.join(__dirname, dir);
@@ -41,6 +43,9 @@ app.use(json());
 const corsOptions = {
   origin: true,
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  exposedHeaders: ['Content-Disposition'],
 };
 app.use(cors(corsOptions));
 
@@ -77,13 +82,10 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
-// Error handling for file serving
+// Add error handling middleware
 app.use((err, req, res, next) => {
-  if (err.code === 'ENOENT') {
-    res.status(404).json({ error: 'File not found' });
-  } else {
-    res.status(500).json({ error: 'Internal server error' });
-  }
+  console.error('Error:', err);
+  res.status(500).json({ error: err.message });
 });
 
 const PORT = process.env.PORT || 3005;
@@ -100,3 +102,5 @@ const gracefulShutdown = async () => {
 
 process.on('SIGINT', gracefulShutdown);
 process.on('SIGTERM', gracefulShutdown);
+
+export default app;

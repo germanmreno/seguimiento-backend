@@ -3,13 +3,20 @@ import prisma from '../db/prismaClient.js';
 import { authenticateToken } from './auth.js';
 import multer from 'multer';
 import path from 'path';
+import fs from 'fs';
 
 const router = express.Router();
 
-// Configure multer for file uploads
+// Ensure upload directory exists
+const uploadDir = 'uploads/oficios-presidencia';
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+// Configure multer
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, 'uploads/oficios-presidencia');
+    cb(null, uploadDir);
   },
   filename: function (req, file, cb) {
     cb(null, `${Date.now()}-${file.originalname}`);
@@ -18,73 +25,62 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
-// Create a new oficio with file upload
+// Debug middleware
+router.use((req, res, next) => {
+  console.log(`${req.method} ${req.path}`, {
+    body: req.body,
+    files: req.files,
+  });
+  next();
+});
+
+// Create a new oficio
 router.post(
   '/',
   authenticateToken,
-  upload.array('documento_escaneado'),
+  upload.single('documento_escaneado'),
   async (req, res) => {
     try {
+      console.log('Received request to create oficio:', {
+        body: req.body,
+        file: req.file,
+      });
+
       const {
+        numero,
+        elaboradoPor,
         institucion,
         destinatario,
         asunto,
         fechaElaboracion,
         fechaEntrega,
         requiereRespuesta,
-        status,
       } = req.body;
 
-      // Validate required fields
-      const requiredFields = [
-        'institucion',
-        'destinatario',
-        'asunto',
-        'fechaElaboracion',
-        'fechaEntrega',
-        'requiereRespuesta',
-      ];
-      const missingFields = requiredFields.filter(
-        (field) => req.body[field] === undefined
-      );
-
-      if (missingFields.length > 0) {
-        return res.status(400).json({
-          error: `Campos requeridos faltantes: ${missingFields.join(', ')}`,
-        });
-      }
-
-      // Validate status if provided
-      if (status && !['FINALIZADO', 'PENDIENTE'].includes(status)) {
-        return res.status(400).json({
-          error: 'Estado inválido. Debe ser FINALIZADO o PENDIENTE',
-        });
-      }
-
-      // Process uploaded files
-      const documentUrls = req.files
-        ? req.files.map(
-            (file) => `/uploads/oficios-presidencia/${file.filename}`
-          )
-        : [];
-
+      // Create the oficio
       const oficio = await prisma.oficioPresidencia.create({
         data: {
+          numero,
+          elaboradoPor: elaboradoPor,
           institucion,
           destinatario,
           asunto,
           fechaElaboracion: new Date(fechaElaboracion),
           fechaEntrega: new Date(fechaEntrega),
-          requiereRespuesta,
-          status: status || 'PENDIENTE',
-          documento_escaneado: documentUrls.length > 0 ? documentUrls[0] : null, // Store the first file URL
+          requiereRespuesta: requiereRespuesta === 'true',
+          status: 'PENDIENTE',
+          documento_escaneado: req.file
+            ? `/uploads/oficios-presidencia/${req.file.filename}`
+            : null,
         },
       });
 
       res.status(201).json(oficio);
     } catch (error) {
       console.error('Error creating oficio:', error);
-      res.status(500).json({ error: 'Error al crear el oficio' });
+      res
+        .status(500)
+        .json({ error: 'Error al crear el oficio', details: error.message });
     }
   }
 );
@@ -92,13 +88,9 @@ router.post(
 // Get all oficios
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    const { status } = req.query;
-
     const oficios = await prisma.oficioPresidencia.findMany({
-      where: status ? { status } : undefined,
-      orderBy: [{ fechaEntrega: 'desc' }, { fechaElaboracion: 'desc' }],
+      orderBy: [{ fechaEntrega: 'desc' }, { created_at: 'desc' }],
     });
-
     res.json(oficios);
   } catch (error) {
     console.error('Error fetching oficios:', error);
@@ -106,7 +98,7 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
-// Get a single oficio by ID
+// Get a single oficio
 router.get('/:id', authenticateToken, async (req, res) => {
   try {
     const oficio = await prisma.oficioPresidencia.findUnique({
